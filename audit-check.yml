@@ -1,0 +1,25 @@
+name: Quarterly Audit Check
+
+on:
+  schedule:
+    # Runs at 9am UTC on the 1st of Jan/Apr/Jul/Oct (quarterly).
+    # Change the cron below to run more often (e.g. weekly) if you want earlier warnings.
+    - cron: "0 9 1 1,4,7,10 *"
+  workflow_dispatch: {} # lets you trigger it manually from the Actions tab to test
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run audit check and send email if needed
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NOTIFY_EMAILS: ${{ secrets.NOTIFY_EMAILS }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+        run: node scripts/send-audit-email.js
