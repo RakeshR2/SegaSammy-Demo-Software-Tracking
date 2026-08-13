@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo Software Control — R2 Gaming</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<style>
+  :root{
+    --ink:#1b1f1c; --paper:#f6f4ee; --line:#c9c2b2; --steel:#3d4a42;
+    --brass:#a8763e; --ok:#3f6b4a; --warn:#a8763e; --overdue:#a13d2f;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans); padding:28px 20px 60px;}
+  .wrap{max-width:1080px; margin:0 auto;}
+  .tag{display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--steel); border:1px solid var(--line); padding:3px 8px; border-radius:2px; background:#fff;}
+  h1{font-family:var(--mono); font-size:24px; margin:10px 0 2px; letter-spacing:-0.01em;}
+  .sub{color:#6b6558; font-size:13.5px; margin-bottom:20px;}
+  .panel{background:#fff; border:1px solid var(--line); border-radius:3px; padding:18px 20px; margin-bottom:16px;}
+  .panel h2{font-family:var(--mono); font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--steel); margin:0 0 14px;}
+  .metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px;}
+  .metric b{display:block; font-family:var(--mono); font-size:26px; line-height:1;}
+  .metric span{font-size:11px; color:#6b6558; text-transform:uppercase; letter-spacing:.06em;}
+  .audit-row{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:16px; padding-top:16px; border-top:1px solid #ece7db;}
+  .audit-stat{display:flex; gap:22px; flex-wrap:wrap;}
+  button{font-family:var(--sans); font-size:13px; font-weight:600; border:1px solid var(--ink); background:var(--ink); color:#fff; padding:9px 14px; border-radius:2px; cursor:pointer;}
+  button.secondary{background:#fff; color:var(--ink);}
+  button.ghost{background:transparent; border-color:var(--line); color:var(--steel); font-weight:500;}
+  button:hover{opacity:.85;}
+  button:disabled{opacity:.5; cursor:not-allowed;}
+  .tabs{display:flex; gap:4px; margin-bottom:14px;}
+  .tab{font-family:var(--mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; padding:8px 14px; border:1px solid var(--line); border-bottom:none; background:#efece2; color:var(--steel); cursor:pointer; border-radius:3px 3px 0 0;}
+  .tab.active{background:#fff; color:var(--ink); font-weight:700;}
+  .tabpanel{display:none;} .tabpanel.active{display:block;}
+  table{width:100%; border-collapse:collapse; margin-top:6px; font-size:13px;}
+  th{text-align:left; font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#6b6558; border-bottom:1px solid var(--line); padding:7px 5px; white-space:nowrap;}
+  td{border-bottom:1px solid #ece7db; padding:8px 5px; vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .status-pill{font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:10px; white-space:nowrap;}
+  .status-Lockbox{background:#e4ede4; color:var(--ok);}
+  .status-Cabinet{background:#f3e6d2; color:var(--brass);}
+  .status-Controller{background:#dde6ee; color:#3a5a78;}
+  .status-Returned{background:#e6e3da; color:var(--steel);}
+  .audit-ok{color:var(--ok); font-family:var(--mono); font-size:11.5px;}
+  .audit-due{color:var(--warn); font-family:var(--mono); font-size:11.5px;}
+  .audit-overdue{color:var(--overdue); font-family:var(--mono); font-size:11.5px; font-weight:700;}
+  input, select{font-family:var(--sans); font-size:12.5px; border:1px solid var(--line); border-radius:2px; padding:6px 7px; width:100%; background:#fff;}
+  .grid-add{display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-bottom:10px; align-items:end;}
+  .grid-add label{font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#6b6558; display:block; margin-bottom:3px;}
+  .row-actions{display:flex; gap:5px;}
+  .row-actions button{padding:4px 7px; font-size:10.5px;}
+  .empty{color:#948d7c; font-size:13px; padding:18px 0; text-align:center;}
+  .note{font-size:12px; color:#6b6558; line-height:1.5; margin-top:10px;}
+  .sop{font-size:12.5px; line-height:1.6; color:#3d4a42;}
+  .sop b{color:var(--ink);}
+  .login-wrap{max-width:380px; margin:80px auto; text-align:center;}
+  .login-wrap input{margin:14px 0; text-align:center; padding:10px;}
+  .login-msg{font-size:12.5px; color:var(--steel); margin-top:10px; min-height:18px;}
+  .topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .who{font-family:var(--mono); font-size:11.5px; color:#6b6558;}
+  @media (max-width:760px){ .grid-add{grid-template-columns:1fr 1fr;} }
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-wrap">
+  <span class="tag">R2 Gaming — Demo Software Control</span>
+  <h1 style="margin-top:14px;">Sign in</h1>
+  <div class="sub">Enter your email — we'll send a magic link, no password needed.</div>
+  <input id="loginEmail" type="email" placeholder="you@r2gaming.com">
+  <button id="loginBtn" style="width:100%;">Send magic link</button>
+  <div class="login-msg" id="loginMsg"></div>
+</div>
+
+<div class="wrap" id="app" style="display:none;">
+  <div class="topbar">
+    <span class="tag">R2 Gaming — Demo Software Control</span>
+    <span class="who" id="whoami"></span>
+  </div>
+  <h1>Demo Software Control Dashboard</h1>
+  <div class="sub">SegaSammy loaned media — master inventory, checkout log, and quarterly custody confirmation.</div>
+
+  <div class="panel">
+    <h2>Key Control Metrics</h2>
+    <div class="metrics">
+      <div class="metric"><b id="mTotal">0</b><span>Total Media Registered</span></div>
+      <div class="metric"><b id="mLockbox">0</b><span>In Lockbox (Secured)</span></div>
+      <div class="metric"><b id="mDeployed">0</b><span>On Cabinets</span></div>
+      <div class="metric"><b id="mController">0</b><span>On Controllers</span></div>
+      <div class="metric"><b id="mReturned">0</b><span>Returned to Manufacturer</span></div>
+    </div>
+    <div class="audit-row">
+      <div class="audit-stat">
+        <div class="metric"><b id="statOk" style="color:var(--ok); font-size:20px;">–</b><span>Confirmed &lt; 90d</span></div>
+        <div class="metric"><b id="statDue" style="color:var(--warn); font-size:20px;">–</b><span>Due soon</span></div>
+        <div class="metric"><b id="statOverdue" style="color:var(--overdue); font-size:20px;">–</b><span>Overdue</span></div>
+      </div>
+      <button id="confirmAllBtn">Confirm all media present today</button>
+    </div>
+    <div class="note">Items are flagged <b style="color:var(--warn)">due soon</b> at 75 days since last confirmed and <b style="color:var(--overdue)">overdue</b> at 90 — matching a quarterly cadence. A scheduled email goes to the notification list when items go overdue (see GitHub Action).</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="inventory">Master Inventory</div>
+    <div class="tab" data-tab="checkout">Checkout Log</div>
+    <div class="tab" data-tab="sop">SOP Highlights</div>
+  </div>
+
+  <div class="tabpanel active" id="tab-inventory">
+    <div class="panel">
+      <h2>Add Media Item</h2>
+      <div class="grid-add">
+        <div><label>Item ID</label><input id="invItemId" placeholder="S35"></div>
+        <div><label>Manufacturer</label><input id="invMfr" placeholder="SegaSammy"></div>
+        <div><label>Media type</label><input id="invType" placeholder="CFast / BIOS / USB"></div>
+        <div><label>Software / Title</label><input id="invTitle" placeholder="e.g. Railroad Riches"></div>
+        <div><label>Part / Version #</label><input id="invPart" placeholder="e.g. v2.3"></div>
+        <div><label>Qty</label><input id="invQty" type="number" value="1" min="1"></div>
+      </div>
+      <div class="grid-add" style="grid-template-columns:1fr 2fr auto;">
+        <div>
+          <label>Status</label>
+          <select id="invStatus">
+            <option value="Lockbox">In lockbox</option>
+            <option value="Cabinet">On cabinet</option>
+            <option value="Controller">On controller</option>
+            <option value="Returned">Returned to manufacturer</option>
+          </select>
+        </div>
+        <div><label>Notes</label><input id="invNotes" placeholder="optional"></div>
+        <div><button id="invAddBtn" style="width:100%;">Add item</button></div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Item ID</th><th>Manufacturer</th><th>Media Type</th><th>Software / Title</th>
+          <th>Part / Ver #</th><th>Qty</th><th>Status</th><th>Notes</th><th>Last Confirmed</th><th>Audit</th><th></th>
+        </tr></thead>
+        <tbody id="invBody"><tr><td colspan="11" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tabpanel" id="tab-checkout">
+    <div class="panel">
+      <h2>Add Checkout Log Entry</h2>
+      <div class="grid-add">
+        <div><label>Item ID</label><input id="coItemId" placeholder="S1"></div>
+        <div><label>Media description</label><input id="coDesc" placeholder="e.g. Crest CFast card"></div>
+        <div><label>Target cabinet / purpose</label><input id="coTarget" placeholder="Crest #2 / customer demo"></div>
+        <div><label>Checked out by</label><input id="coOutBy" placeholder="e.g. Jiwan"></div>
+        <div><label>Expected return date</label><input id="coExpected" type="date"></div>
+        <div><button id="coAddBtn" style="width:100%;">Log checkout</button></div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Log ID</th><th>Item ID</th><th>Description</th><th>Out</th><th>Target</th>
+          <th>Out By</th><th>Expected Return</th><th>In</th><th>In By</th><th></th>
+        </tr></thead>
+        <tbody id="coBody"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tabpanel" id="tab-sop">
+    <div class="panel">
+      <h2>Standard Operating Procedure Highlights</h2>
+      <div class="sop">
+        <p><b>1. Single Cabinet License Restriction</b> — Each software media set is licensed for use on ONE cabinet at a time. Do not copy, clone, image, or transfer software onto multiple machines.</p>
+        <p><b>2. Lockbox Security</b> — When not in active demonstration, all physical media (CFast, BIOS, USB) must be locked in the secure storage box.</p>
+        <p><b>3. Special Function Safeguards</b> — Diagnostic and forced-outcome inputs (jackpot/credit simulation) are strictly confidential to designated personnel.</p>
+        <p><b>4. Location Control</b> — Software must remain at R2 Gaming showroom/office premises. No offsite removal without explicit manufacturer written consent.</p>
+        <p><b>5. Return &amp; Deletion Protocol</b> — Upon manufacturer request, media must be returned within 5 business days, and all temporary copies deleted with written certification.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">Signed in with magic-link email auth. Everyone who signs in can view and edit. Overdue-item emails are sent by a scheduled GitHub Action, not by this page directly.</div>
+  <div style="margin-top:14px;"><button class="ghost" id="signOutBtn">Sign out</button></div>
+</div>
+
+<script>
+const sb = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+
+let inv = [];
+let checkouts = [];
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function daysSince(dateStr){
+  if(!dateStr) return Infinity;
+  return Math.floor((Date.now() - new Date(dateStr+'T00:00:00').getTime()) / 86400000);
+}
+function auditState(dateStr){
+  const days = daysSince(dateStr);
+  if(!dateStr) return {label:'Never confirmed', cls:'audit-overdue'};
+  if(days >= 90) return {label: days + 'd ago — overdue', cls:'audit-overdue'};
+  if(days >= 75) return {label: days + 'd ago — due soon', cls:'audit-due'};
+  return {label: days + 'd ago', cls:'audit-ok'};
+}
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function statusLabel(s){ return {Lockbox:'In lockbox', Cabinet:'On cabinet', Controller:'On controller', Returned:'Returned'}[s] || s; }
+
+// ---- Auth ----
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const msg = document.getElementById('loginMsg');
+  if(!email){ msg.textContent = 'Enter an email address.'; return; }
+  msg.textContent = 'Sending…';
+  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href } });
+  msg.textContent = error ? ('Error: ' + error.message) : 'Check your email for the magic link.';
+});
+
+document.getElementById('signOutBtn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  window.location.reload();
+});
+
+sb.auth.onAuthStateChange((event, session) => {
+  if(session){
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('whoami').textContent = session.user.email;
+    loadAll();
+  } else {
+    document.getElementById('loginScreen').style.display = 'block';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+// ---- Data ----
+async function loadAll(){
+  const { data: invData, error: invErr } = await sb.from('inventory_items').select('*').order('item_id');
+  if(!invErr) inv = invData;
+  const { data: coData, error: coErr } = await sb.from('checkout_log').select('*').order('out_date', { ascending: false });
+  if(!coErr) checkouts = coData;
+  renderInv(); renderCo();
+}
+
+function renderInv(){
+  const tbody = document.getElementById('invBody');
+  tbody.innerHTML = '';
+  if(inv.length===0){
+    tbody.innerHTML = '<tr><td colspan="11" class="empty">No items yet — add your first one above.</td></tr>';
+  } else {
+    inv.forEach(it=>{
+      const a = auditState(it.last_audited);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(it.item_id)}</td>
+        <td>${escapeHtml(it.manufacturer)}</td>
+        <td>${escapeHtml(it.media_type)}</td>
+        <td>${escapeHtml(it.title)}</td>
+        <td>${escapeHtml(it.part_version)}</td>
+        <td>${escapeHtml(it.qty)}</td>
+        <td><span class="status-pill status-${it.status}">${statusLabel(it.status)}</span></td>
+        <td>${escapeHtml(it.notes)}</td>
+        <td>${it.last_audited || '—'}</td>
+        <td><span class="${a.cls}">${a.label}</span></td>
+        <td class="row-actions">
+          <button class="secondary" data-act="confirm" data-id="${it.id}">Confirm</button>
+          <button class="ghost" data-act="remove" data-id="${it.id}">Remove</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  updateMetrics();
+}
+
+function renderCo(){
+  const tbody = document.getElementById('coBody');
+  tbody.innerHTML = '';
+  if(checkouts.length===0){
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">No checkout entries yet.</td></tr>';
+    return;
+  }
+  checkouts.forEach(c=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(c.log_id)}</td>
+      <td>${escapeHtml(c.item_id)}</td>
+      <td>${escapeHtml(c.description)}</td>
+      <td>${c.out_date ? c.out_date.slice(0,10) : '—'}</td>
+      <td>${escapeHtml(c.target)}</td>
+      <td>${escapeHtml(c.checked_out_by)}</td>
+      <td>${c.expected_return || '—'}</td>
+      <td>${c.in_date ? c.in_date.slice(0,10) : '—'}</td>
+      <td>${escapeHtml(c.checked_in_by)||'—'}</td>
+      <td class="row-actions">
+        ${!c.in_date ? `<button class="secondary" data-act="checkin" data-id="${c.id}">Check in</button>` : ''}
+        <button class="ghost" data-act="coremove" data-id="${c.id}">Remove</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function updateMetrics(){
+  document.getElementById('mTotal').textContent = inv.length;
+  document.getElementById('mLockbox').textContent = inv.filter(i=>i.status==='Lockbox').length;
+  document.getElementById('mDeployed').textContent = inv.filter(i=>i.status==='Cabinet').length;
+  document.getElementById('mController').textContent = inv.filter(i=>i.status==='Controller').length;
+  document.getElementById('mReturned').textContent = inv.filter(i=>i.status==='Returned').length;
+  let ok=0,due=0,overdue=0;
+  inv.forEach(it=>{
+    const d = daysSince(it.last_audited);
+    if(d>=90) overdue++; else if(d>=75) due++; else ok++;
+  });
+  document.getElementById('statOk').textContent = ok;
+  document.getElementById('statDue').textContent = due;
+  document.getElementById('statOverdue').textContent = overdue;
+}
+
+document.getElementById('invAddBtn').addEventListener('click', async ()=>{
+  const item_id = document.getElementById('invItemId').value.trim();
+  const title = document.getElementById('invTitle').value.trim();
+  if(!item_id || !title) return;
+  const { error } = await sb.from('inventory_items').insert({
+    item_id,
+    manufacturer: document.getElementById('invMfr').value.trim(),
+    media_type: document.getElementById('invType').value.trim(),
+    title,
+    part_version: document.getElementById('invPart').value.trim(),
+    qty: Number(document.getElementById('invQty').value) || 1,
+    status: document.getElementById('invStatus').value,
+    notes: document.getElementById('invNotes').value.trim(),
+  });
+  if(error){ alert('Error adding item: ' + error.message); return; }
+  ['invItemId','invMfr','invType','invTitle','invPart','invNotes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('invQty').value = 1;
+  loadAll();
+});
+
+document.getElementById('confirmAllBtn').addEventListener('click', async ()=>{
+  const t = todayStr();
+  const { error } = await sb.from('inventory_items').update({ last_audited: t }).neq('id', '00000000-0000-0000-0000-000000000000');
+  if(error){ alert('Error confirming: ' + error.message); return; }
+  loadAll();
+});
+
+document.getElementById('invBody').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.dataset.act==='confirm'){
+    await sb.from('inventory_items').update({ last_audited: todayStr() }).eq('id', id);
+  } else if(btn.dataset.act==='remove'){
+    if(!confirm('Remove this item?')) return;
+    await sb.from('inventory_items').delete().eq('id', id);
+  }
+  loadAll();
+});
+
+document.getElementById('coAddBtn').addEventListener('click', async ()=>{
+  const item_id = document.getElementById('coItemId').value.trim();
+  const description = document.getElementById('coDesc').value.trim();
+  if(!item_id || !description) return;
+  const logId = 'LOG-' + (checkouts.length+1).toString().padStart(3,'0');
+  const { error } = await sb.from('checkout_log').insert({
+    log_id: logId, item_id, description,
+    target: document.getElementById('coTarget').value.trim(),
+    checked_out_by: document.getElementById('coOutBy').value.trim(),
+    expected_return: document.getElementById('coExpected').value || null,
+  });
+  if(error){ alert('Error logging checkout: ' + error.message); return; }
+  ['coItemId','coDesc','coTarget','coOutBy','coExpected'].forEach(id=>document.getElementById(id).value='');
+  loadAll();
+});
+
+document.getElementById('coBody').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.dataset.act==='checkin'){
+    const inBy = prompt('Checked in by:') || '';
+    await sb.from('checkout_log').update({ in_date: new Date().toISOString(), checked_in_by: inBy }).eq('id', id);
+  } else if(btn.dataset.act==='coremove'){
+    if(!confirm('Remove this log entry?')) return;
+    await sb.from('checkout_log').delete().eq('id', id);
+  }
+  loadAll();
+});
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tabpanel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+// Check current session on load (in case of redirect back from magic link)
+sb.auth.getSession().then(({ data: { session } }) => {
+  if(session){
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('whoami').textContent = session.user.email;
+    loadAll();
+  }
+});
+</script>
+</body>
+</html>
